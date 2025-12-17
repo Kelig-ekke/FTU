@@ -55,7 +55,7 @@ class SolarSystemSimulation:
             planet = Planet(
                 name=data['name'],
                 orbit_radius=data['orbit_radius'],
-                orbit_speed=['orbit_speed'],
+                orbit_speed=data['orbit_speed'],
                 size=data['size'],
                 color=tuple(data['color']),
                 show_orbit=True
