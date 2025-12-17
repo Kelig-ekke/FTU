@@ -54,4 +54,3 @@ class Planet:
         # Отображаем имя планеты
         font = pygame.font.Font(None, 20)
         text = font.render(self.name, True, (255, 255, 255))
-        screen.blit(text, (screen_x + 10, screen_y - 10))
