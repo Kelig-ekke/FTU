@@ -94,13 +94,13 @@ class SolarSystemSimulation:
         if not self.is_paused:
             for planet in self.planets:
                 planet.update(delta_time, self.time_scale)
-            
-            # Если следим за планетой, центрируем камеру на ней
-            if self.follow_planet is not None:
-                planet = self.planets[self.follow_planet]
-                x, y = planet.get_position()
-                self.camera_x = self.window_width // 2 - x * self.scale
-                self.camera_y = self.window_height // 2 - y * self.scale
+        
+        # Если следим за планетой, центрируем камеру на ней (работает и при паузе)
+        if self.follow_planet is not None:
+            planet = self.planets[self.follow_planet]
+            x, y = planet.get_position()
+            self.camera_x = self.window_width // 2 - x * self.scale
+            self.camera_y = self.window_height // 2 - y * self.scale
     
     def draw(self, screen):
         # Очищаем экран
@@ -136,8 +136,9 @@ class SolarSystemSimulation:
                              (x, y), size)
     
     def draw_sun(self, screen):
-        sun_x = self.window_width // 2
-        sun_y = self.window_height // 2
+        # Солнце находится в начале координат (0, 0)
+        sun_x = self.camera_x
+        sun_y = self.camera_y
         
         # Масштабируем Солнце вместе с общим масштабом
         current_sun_radius = self.base_sun_radius * self.scale
@@ -156,7 +157,7 @@ class SolarSystemSimulation:
         
         # Рисуем само Солнце
         pygame.draw.circle(screen, (255, 255, 0), 
-                          (sun_x, sun_y), 
+                          (int(sun_x), int(sun_y)), 
                           int(current_sun_radius))
         
         # Добавляем текстуру Солнцу (пятна)
@@ -219,6 +220,18 @@ class SolarSystemSimulation:
             self.is_paused = not self.is_paused
             self.buttons['start_pause']['text'] = 'Start' if self.is_paused else 'Pause'
         
+        elif button_name == 'slow_down':
+            self.change_speed(up=False)
+        
+        elif button_name == 'speed_up':
+            self.change_speed(up=True)
+        
+        elif button_name == 'zoom_in':
+            self.change_zoom(plus=True)
+        
+        elif button_name == 'zoom_out':
+            self.change_zoom(plus=False)
+        
         elif button_name == 'reset':
             self.camera_x = self.window_width // 2
             self.camera_y = self.window_height // 2
@@ -227,11 +240,23 @@ class SolarSystemSimulation:
         
         elif button_name == 'follow_earth':
             # Ищем Землю
+            earth_index = None
             for i, planet in enumerate(self.planets):
                 if planet.name == "Earth":
-                    self.follow_planet = i
-                    self.target_scale = 2.0  # Увеличиваем масштаб при слежении
+                    earth_index = i
                     break
+            
+            if earth_index is not None:
+                if self.follow_planet == earth_index:
+                    # Если уже следим за Землей, отключаем фокус
+                    self.camera_x = self.window_width // 2
+                    self.camera_y = self.window_height // 2
+                    self.target_scale = 1.0
+                    self.follow_planet = None
+                else:
+                    # Иначе включаем фокус на Землю
+                    self.follow_planet = earth_index
+                    self.target_scale = 2.0
 
     
     def handle_keypress(self, key):
@@ -240,9 +265,9 @@ class SolarSystemSimulation:
             self.is_paused = not self.is_paused
             self.buttons['start_pause']['text'] = 'Start' if self.is_paused else 'Pause'
         elif key == pygame.K_PLUS or key == pygame.K_EQUALS:
-            self.target_scale = min(self.target_scale * 1.2, 10.0)
+            self.change_zoom(plus=True)
         elif key == pygame.K_MINUS:
-            self.target_scale = max(self.target_scale / 1.2, 0.05)
+            self.change_zoom(plus=False)
         elif key == pygame.K_UP:
             self.change_speed(up=True)
         elif key == pygame.K_DOWN:
@@ -253,16 +278,28 @@ class SolarSystemSimulation:
             self.target_scale = 1.0
             self.follow_planet = None
         elif key == pygame.K_e:
-            # Следить за Землей
+            # Следить за Землей или отключить фокус при повторном нажатии
+            earth_index = None
             for i, planet in enumerate(self.planets):
                 if planet.name == "Earth":
-                    self.follow_planet = i
-                    self.target_scale = 2.0
+                    earth_index = i
                     break
+            
+            if earth_index is not None:
+                if self.follow_planet == earth_index:
+                    # Если уже следим за Землей, отключаем фокус
+                    self.camera_x = self.window_width // 2
+                    self.camera_y = self.window_height // 2
+                    self.target_scale = 1.0
+                    self.follow_planet = None
+                else:
+                    # Иначе включаем фокус на Землю
+                    self.follow_planet = earth_index
+                    self.target_scale = 2.0
 
 
     def change_speed(self, up=True):
-        speed_levels = [1, 2, 5, 10, 20, 30, 40, 50]
+        speed_levels = [0.1, 0.5, 1, 2, 5, 10, 20, 30, 40, 50]
         
         if up:
             # Находим следующую скорость в списке
@@ -270,28 +307,35 @@ class SolarSystemSimulation:
                 if speed > self.time_scale:
                     self.time_scale = speed
                     return
+            # Если уже на максимуме, остаемся на месте
+            if self.time_scale < speed_levels[-1]:
+                self.time_scale = speed_levels[-1]
         else:
             # Находим предыдущую скорость в списке
             for speed in reversed(speed_levels):
                 if speed < self.time_scale:
                     self.time_scale = speed
                     return
+            # Если уже на минимуме, остаемся на месте
+            if self.time_scale > speed_levels[0]:
+                self.time_scale = speed_levels[0]
 
     def change_zoom(self, plus=True):
-        zoom_levels = [0.2, 0.5, 1, 2, 3, 5, 7, 10]
+        zoom_levels = [0.5, 1, 2, 5, 8]
 
         if plus:
             for zoom in zoom_levels:
-                if zoom > self.zoom_scale:
-                    self.zoom_scale = zoom
+                if zoom > self.target_scale:
+                    self.target_scale = zoom
                     return
+            # Если уже на максимуме, остаемся на месте
+            if self.target_scale < zoom_levels[-1]:
+                self.target_scale = zoom_levels[-1]
         else:
             for zoom in reversed(zoom_levels):
-                if zoom < self.zoom_scale:
-                    self.zoom_scale = zoom
+                if zoom < self.target_scale:
+                    self.target_scale = zoom
                     return
-        # elif button_name == 'zoom_in':
-        #     self.target_scale = min(self.target_scale * 1.2, 10.0)  # Увеличил максимальный масштаб
-        
-        # elif button_name == 'zoom_out':
-        #     self.target_scale = max(self.target_scale / 1.2, 0.05)
+            # Если уже на минимуме, остаемся на месте
+            if self.target_scale > zoom_levels[0]:
+                self.target_scale = zoom_levels[0]
