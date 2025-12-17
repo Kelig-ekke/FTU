@@ -24,7 +24,7 @@ class SolarSystemSimulation:
         self.setup_ui()
     
     def load_settings(self, settings_file):
-        with open(settings_file, 'r') as f:
+        with open(settings_file, 'r', encoding='utf-8') as f:
             settings = json.load(f)
         
         self.window_width = settings['window_width']
@@ -34,34 +34,28 @@ class SolarSystemSimulation:
         self.planet_data = settings['planets']
     
     def setup_planets(self):
-        # Настраиваем относительные размеры планет (для лучшей визуализации)
-        # В реальности соотношения размеров гораздо больше
-        planet_sizes = {
-            "Mercury": 4,
-            "Venus": 10,
-            "Earth": 11,
-            "Mars": 6,
-            "Jupiter": 24,
-            "Saturn": 20,
-            "Uranus": 18,
-            "Neptune": 17
-        }
-        
-        # Настраиваем относительные скорости (чем дальше - тем медленнее)
+
         for data in self.planet_data:
-            # Корректируем размер планеты
-            if data['name'] in planet_sizes:
-                data['size'] = planet_sizes[data['name']]
+        #     planet = Planet(
+        #         name=data['name'],
+        #         orbit_radius=data['orbit_radius'],
+        #         orbit_speed=data['orbit_speed'],  # Берем из JSON
+        
+        # # Настраиваем относительные скорости (чем дальше - тем медленнее)
+        # for data in self.planet_data:
+        #     # Корректируем размер планеты
+        #     if data['name'] in planet_sizes:
+        #         data['size'] = planet_sizes[data['name']]
             
-            # Делаем скорости более реалистичными (закон Кеплера)
-            # Скорость обратно пропорциональна квадратному корню из радиуса орбиты
-            base_speed = 0.01
-            kepler_speed = base_speed * math.sqrt(170 / data['orbit_radius'])  # 170 - радиус Земли
+        #     # Делаем скорости более реалистичными (закон Кеплера)
+        #     # Скорость обратно пропорциональна квадратному корню из радиуса орбиты
+        #     base_speed = 0.01
+        #     kepler_speed = base_speed * math.sqrt(170 / data['orbit_radius'])  # 170 - радиус Земли 
             
             planet = Planet(
                 name=data['name'],
                 orbit_radius=data['orbit_radius'],
-                orbit_speed=kepler_speed,
+                orbit_speed=['orbit_speed'],
                 size=data['size'],
                 color=tuple(data['color']),
                 show_orbit=True
@@ -95,7 +89,7 @@ class SolarSystemSimulation:
             for planet in self.planets:
                 planet.update(delta_time, self.time_scale)
         
-        # Если следим за планетой, центрируем камеру на ней (работает и при паузе)
+        # Если следим за планетой, центрируем камеру на ней
         if self.follow_planet is not None:
             planet = self.planets[self.follow_planet]
             x, y = planet.get_position()
@@ -160,16 +154,6 @@ class SolarSystemSimulation:
                           (int(sun_x), int(sun_y)), 
                           int(current_sun_radius))
         
-        # Добавляем текстуру Солнцу (пятна)
-        for i in range(8):
-            angle = i * (2 * math.pi / 8)
-            distance = current_sun_radius * 0.7
-            spot_x = sun_x + math.cos(angle) * distance
-            spot_y = sun_y + math.sin(angle) * distance
-            spot_radius = current_sun_radius * 0.1
-            pygame.draw.circle(screen, (255, 200, 0), 
-                             (int(spot_x), int(spot_y)), 
-                             int(spot_radius))
     
     def draw_info(self, screen):
         font = pygame.font.Font(None, 24)
