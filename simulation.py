@@ -36,21 +36,6 @@ class SolarSystemSimulation:
     def setup_planets(self):
 
         for data in self.planet_data:
-        #     planet = Planet(
-        #         name=data['name'],
-        #         orbit_radius=data['orbit_radius'],
-        #         orbit_speed=data['orbit_speed'],  # Берем из JSON
-        
-        # # Настраиваем относительные скорости (чем дальше - тем медленнее)
-        # for data in self.planet_data:
-        #     # Корректируем размер планеты
-        #     if data['name'] in planet_sizes:
-        #         data['size'] = planet_sizes[data['name']]
-            
-        #     # Делаем скорости более реалистичными (закон Кеплера)
-        #     # Скорость обратно пропорциональна квадратному корню из радиуса орбиты
-        #     base_speed = 0.01
-        #     kepler_speed = base_speed * math.sqrt(170 / data['orbit_radius'])  # 170 - радиус Земли 
             
             planet = Planet(
                 name=data['name'],
@@ -74,9 +59,19 @@ class SolarSystemSimulation:
             'speed_up': {'rect': pygame.Rect(170, 10, 40, 40), 'text': '>>'},
             'zoom_in': {'rect': pygame.Rect(220, 10, 40, 40), 'text': '+'},
             'zoom_out': {'rect': pygame.Rect(270, 10, 40, 40), 'text': '-'},
-            'reset': {'rect': pygame.Rect(320, 10, 160, 40), 'text': 'Сбросить вид'},
-            'follow_earth': {'rect': pygame.Rect(490, 10, 250, 40), 'text': 'Следовать за Землей'}
+            'reset': {'rect': pygame.Rect(10, self.window_height - 50, 160, 40), 'text': 'Сбросить вид'}
         }
+        
+        # Добавляем кнопки для слежения за каждой планетой
+        # x_offset = 40
+        for i, planet in enumerate(self.planets):
+            button_width = 110
+            button_height = 40
+            self.buttons[f'follow_planet_{i}'] = {
+                'rect': pygame.Rect(10, 350 + i * 50, button_width, button_height),
+                'text': planet.name,
+                'planet_index': i
+            }
     
     def update(self, delta_time):
         # Плавное масштабирование
@@ -107,6 +102,9 @@ class SolarSystemSimulation:
         for planet in self.planets:
             planet.draw(screen, self.camera_x, self.camera_y, self.scale)
         
+        # Рисуем названия планет
+        self.draw_planet_names(screen)
+        
         # Рисуем Солнце с масштабированием
         self.draw_sun(screen)
         
@@ -115,6 +113,22 @@ class SolarSystemSimulation:
         
         # Рисуем кнопки
         self.draw_buttons(screen)
+
+    def draw_planet_names(self, screen):
+        # Отображаем названия планет рядом с ними
+        font = pygame.font.Font(None, 16)
+        for planet in self.planets:
+            x, y = planet.get_position()
+            screen_x = self.camera_x + x * self.scale
+            screen_y = self.camera_y + y * self.scale
+            
+            # Вычисляем экранный радиус планеты и позицию над верхней точкой
+            planet_screen_radius = max(2, int(planet.size * self.scale))
+            text = font.render(planet.name, True, (200, 200, 200))
+            text_x = int(screen_x) - text.get_width() // 2
+            text_y = int(screen_y) - planet_screen_radius - text.get_height() - 4
+            screen.blit(text, (text_x, text_y))
+    
     
     def draw_stars(self, screen):
         # Рисуем звездочки на фоне
@@ -139,7 +153,7 @@ class SolarSystemSimulation:
         
         # Рисуем свечение Солнца
         for i in range(3, 0, -1):
-            glow_radius = current_sun_radius * (1 + i * 0.1)
+            glow_radius = current_sun_radius * (1 + i * 0.2)
             alpha = 50 - i * 10
             glow_surface = pygame.Surface((int(glow_radius * 2), int(glow_radius * 2)), pygame.SRCALPHA)
             pygame.draw.circle(glow_surface, 
@@ -154,19 +168,18 @@ class SolarSystemSimulation:
                           (int(sun_x), int(sun_y)), 
                           int(current_sun_radius))
         
-    
     def draw_info(self, screen):
         font = pygame.font.Font(None, 24)
         
         # Информация о скорости и масштабе
-        speed_text = f"Speed: {self.time_scale:.1f}x"
-        scale_text = f"Scale: {self.scale:.2f}"
-        status_text = "Paused" if self.is_paused else "Running"
+        speed_text = f"Скорость: {self.time_scale:.1f}x"
+        scale_text = f"Масштаб: {self.scale:.2f}"
+        status_text = "Пауза" if self.is_paused else "Симуляция запущена"
         
         # Информация о слежении
-        follow_text = "Free view"
+        follow_text = "Слежение: Нет"
         if self.follow_planet is not None:
-            follow_text = f"Following: {self.planets[self.follow_planet].name}"
+            follow_text = f"Слежение: {self.planets[self.follow_planet].name}"
         
         texts = [
             speed_text,
@@ -202,7 +215,7 @@ class SolarSystemSimulation:
     def handle_button_click(self, button_name):
         if button_name == 'start_pause':
             self.is_paused = not self.is_paused
-            self.buttons['start_pause']['text'] = 'Start' if self.is_paused else 'Pause'
+            self.buttons['start_pause']['text'] = 'Старт' if self.is_paused else 'Пауза'
         
         elif button_name == 'slow_down':
             self.change_speed(up=False)
@@ -222,25 +235,20 @@ class SolarSystemSimulation:
             self.target_scale = 1.0
             self.follow_planet = None
         
-        elif button_name == 'follow_earth':
-            # Ищем Землю
-            earth_index = None
-            for i, planet in enumerate(self.planets):
-                if planet.name == "Earth":
-                    earth_index = i
-                    break
+        elif button_name.startswith('follow_planet_'):
+            # Обработка кнопок слежения за планетами
+            planet_index = self.buttons[button_name]['planet_index']
             
-            if earth_index is not None:
-                if self.follow_planet == earth_index:
-                    # Если уже следим за Землей, отключаем фокус
-                    self.camera_x = self.window_width // 2
-                    self.camera_y = self.window_height // 2
-                    self.target_scale = 1.0
-                    self.follow_planet = None
-                else:
-                    # Иначе включаем фокус на Землю
-                    self.follow_planet = earth_index
-                    self.target_scale = 2.0
+            if self.follow_planet == planet_index:
+                # Если уже следим за этой планетой, отключаем фокус
+                self.camera_x = self.window_width // 2
+                self.camera_y = self.window_height // 2
+                self.target_scale = 1.0
+                self.follow_planet = None
+            else:
+                # Иначе включаем фокус на выбранную планету
+                self.follow_planet = planet_index
+                self.target_scale = 2.0
 
     
     def handle_keypress(self, key):
@@ -261,29 +269,9 @@ class SolarSystemSimulation:
             self.camera_y = self.window_height // 2
             self.target_scale = 1.0
             self.follow_planet = None
-        elif key == pygame.K_e:
-            # Следить за Землей или отключить фокус при повторном нажатии
-            earth_index = None
-            for i, planet in enumerate(self.planets):
-                if planet.name == "Earth":
-                    earth_index = i
-                    break
-            
-            if earth_index is not None:
-                if self.follow_planet == earth_index:
-                    # Если уже следим за Землей, отключаем фокус
-                    self.camera_x = self.window_width // 2
-                    self.camera_y = self.window_height // 2
-                    self.target_scale = 1.0
-                    self.follow_planet = None
-                else:
-                    # Иначе включаем фокус на Землю
-                    self.follow_planet = earth_index
-                    self.target_scale = 2.0
-
 
     def change_speed(self, up=True):
-        speed_levels = [0.1, 0.5, 1, 2, 5, 10, 20, 30, 40, 50]
+        speed_levels = [0.1, 0.5, 1, 2, 5, 10, 20, 30, 40, 50, 80, 100]
         
         if up:
             # Находим следующую скорость в списке
