@@ -68,7 +68,7 @@ class SolarSystemSimulation:
             button_width = 110
             button_height = 40
             self.buttons[f'follow_planet_{i}'] = {
-                'rect': pygame.Rect(10, 350 + i * 50, button_width, button_height),
+                'rect': pygame.Rect(10, (self.window_height - 500) + i * 50, button_width, button_height),
                 'text': planet.name,
                 'planet_index': i
             }

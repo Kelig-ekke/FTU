@@ -1,6 +1,6 @@
 {
     "window_width": 1200,
-    "window_height": 800,
+    "window_height": 600,
     "background_color": [10, 10, 40],
     "sun_radius": 30,
     "planets": [
